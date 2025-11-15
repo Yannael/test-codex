@@ -32,6 +32,9 @@ class RenderHtmlPageTests(unittest.TestCase):
         self.assertIn("data-keywords=\"Titre apaisant", html)
         self.assertIn("Aucune actualité ne correspond à votre recherche", html)
         self.assertIn("https://actus.ulb.be/article-1", html)
+        self.assertIn("class=\"butterfly-layer\"", html)
+        self.assertIn("audio id=\"soundscape\"", html)
+        self.assertIn("searchInput.addEventListener('search'", html)
 
     def test_render_html_without_articles_shows_placeholder(self) -> None:
         html = html_export.render_html_page([], title="Calme")

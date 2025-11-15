@@ -92,6 +92,7 @@ def render_html_page(articles: Sequence[Article], title: str = "Actus ULB") -> s
       align-items: center;
       padding: 4rem 1rem 3rem;
       transition: background 0.4s ease;
+      position: relative;
     }
 
     header {
@@ -99,6 +100,8 @@ def render_html_page(articles: Sequence[Article], title: str = "Actus ULB") -> s
       width: 100%;
       text-align: center;
       margin-bottom: 2rem;
+      position: relative;
+      z-index: 1;
     }
 
     h1 {
@@ -138,6 +141,8 @@ def render_html_page(articles: Sequence[Article], title: str = "Actus ULB") -> s
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
       gap: 1.5rem;
+      position: relative;
+      z-index: 1;
     }
 
     article.card {
@@ -193,6 +198,8 @@ def render_html_page(articles: Sequence[Article], title: str = "Actus ULB") -> s
       text-align: center;
       font-size: 0.85rem;
       color: var(--muted);
+      position: relative;
+      z-index: 1;
     }
 
     .pill {
@@ -208,6 +215,79 @@ def render_html_page(articles: Sequence[Article], title: str = "Actus ULB") -> s
       text-transform: uppercase;
     }
 
+    .butterfly-layer {
+      position: fixed;
+      inset: 0;
+      overflow: hidden;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .butterfly {
+      position: absolute;
+      bottom: -12vh;
+      width: var(--size, 42px);
+      height: var(--size, 42px);
+      opacity: 0;
+      transform-origin: center;
+      animation: flutter var(--duration, 22s) linear infinite;
+      animation-delay: var(--delay, 0s);
+    }
+
+    .butterfly::before,
+    .butterfly::after {
+      content: "";
+      position: absolute;
+      width: 70%;
+      height: 70%;
+      top: 15%;
+      border-radius: 100% 0 100% 0;
+      background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.9), rgba(47, 143, 131, 0.15));
+      box-shadow: 0 0 12px rgba(47, 143, 131, 0.25);
+    }
+
+    .butterfly::before {
+      left: -10%;
+      transform: rotate(35deg);
+    }
+
+    .butterfly::after {
+      right: -10%;
+      transform: scaleX(-1) rotate(35deg);
+    }
+
+    @keyframes flutter {
+      0% {
+        transform: translate3d(0, 0, 0) scale(0.9) rotate(-8deg);
+        opacity: 0;
+      }
+      12% {
+        opacity: 0.7;
+      }
+      50% {
+        transform: translate3d(var(--sway, 60px), -55vh, 0) scale(1) rotate(10deg);
+        opacity: 0.85;
+      }
+      86% {
+        opacity: 0.65;
+      }
+      100% {
+        transform: translate3d(calc(var(--sway, 60px) * -0.4), -110vh, 0) scale(0.95) rotate(-8deg);
+        opacity: 0;
+      }
+    }
+
+    .soundscape {
+      position: fixed;
+      bottom: 1.25rem;
+      right: 1.5rem;
+      z-index: 2;
+      background: var(--card-bg);
+      border-radius: 999px;
+      box-shadow: var(--shadow);
+      padding: 0.35rem 0.75rem;
+    }
+
     @media (max-width: 600px) {
       body {
         padding-top: 3rem;
@@ -220,6 +300,14 @@ def render_html_page(articles: Sequence[Article], title: str = "Actus ULB") -> s
   </style>
 </head>
 <body>
+  <div class="butterfly-layer" aria-hidden="true">
+    <span class="butterfly" style="--delay: -2s; --duration: 24s; --size: 40px;"></span>
+    <span class="butterfly" style="--delay: -8s; --duration: 28s; --size: 48px;"></span>
+    <span class="butterfly" style="--delay: -12s; --duration: 26s; --size: 36px;"></span>
+    <span class="butterfly" style="--delay: -4s; --duration: 30s; --size: 44px;"></span>
+    <span class="butterfly" style="--delay: -16s; --duration: 32s; --size: 38px;"></span>
+    <span class="butterfly" style="--delay: -20s; --duration: 27s; --size: 46px;"></span>
+  </div>
   <header>
     <h1>$title</h1>
     <p class="subtitle">Un espace apaisant pour parcourir les dernières nouvelles de l'ULB.</p>
@@ -235,26 +323,39 @@ $empty_state
   <footer>
     Généré le $generated_at – Les contenus appartiennent à l'Université libre de Bruxelles.
   </footer>
+  <audio id="soundscape" class="soundscape" controls loop preload="auto">
+    <source src="https://cdn.pixabay.com/download/audio/2022/01/19/audio_e8d3ba1adb.mp3?filename=morning-garden-18307.mp3" type="audio/mpeg">
+    Votre navigateur ne supporte pas la lecture audio HTML5.
+  </audio>
   <script>
     const searchInput = document.getElementById('search');
     const cards = Array.from(document.querySelectorAll('article.card'));
     const emptyState = document.querySelector('.empty-state');
+    const butterflies = Array.from(document.querySelectorAll('.butterfly'));
+    const audio = document.getElementById('soundscape');
 
     function normalise(text) {
-      return text
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+      if (!text) return '';
+      let base = text.toLowerCase();
+      if (base.normalize) {
+        base = base.normalize('NFD');
+      }
+      return base
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9\s]/g, ' ')
         .replace(/\s+/g, ' ')
         .trim();
     }
 
     const cardMetadata = cards.map(card => ({
       element: card,
-      keywords: normalise(card.dataset.keywords || '')
+      keywords: normalise((card.dataset.keywords || '') + ' ' + (card.textContent || ''))
     }));
 
     function filterCards() {
+      if (!searchInput) {
+        return;
+      }
       const query = normalise(searchInput.value || '');
       if (!query) {
         cardMetadata.forEach(item => item.element.hidden = false);
@@ -273,7 +374,37 @@ $empty_state
       if (emptyState) emptyState.hidden = visibleCount !== 0;
     }
 
-    searchInput.addEventListener('input', filterCards);
+    if (searchInput) {
+      searchInput.addEventListener('input', filterCards);
+      searchInput.addEventListener('search', filterCards);
+      filterCards();
+    }
+
+    butterflies.forEach(butterfly => {
+      const randomise = () => {
+        const left = Math.random() * 100;
+        const sway = 40 + Math.random() * 80;
+        const duration = 22 + Math.random() * 10;
+        const delay = -Math.random() * 20;
+        butterfly.style.left = left + '%';
+        butterfly.style.setProperty('--sway', sway + 'px');
+        butterfly.style.setProperty('--duration', duration + 's');
+        butterfly.style.setProperty('--delay', delay + 's');
+      };
+      randomise();
+      butterfly.addEventListener('animationiteration', randomise);
+    });
+
+    if (audio) {
+      audio.volume = 0.6;
+      const startPlayback = () => {
+        audio.play().catch(() => {});
+      };
+      if (searchInput) {
+        searchInput.addEventListener('focus', startPlayback, { once: true });
+      }
+      document.addEventListener('pointerdown', startPlayback, { once: true });
+    }
   </script>
 </body>
 </html>
