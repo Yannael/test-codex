@@ -6,9 +6,15 @@ MISSING_DEPENDENCIES = [
 ]
 
 if not MISSING_DEPENDENCIES:
-    from actus_navigator.client import parse_articles  # type: ignore
+    from actus_navigator.client import (  # type: ignore
+        find_rss_feed_url,
+        parse_articles,
+        parse_rss_feed,
+    )
 else:  # pragma: no cover - exercised only when optional deps are missing
     parse_articles = None
+    parse_rss_feed = None  # type: ignore
+    find_rss_feed_url = None  # type: ignore
 
 
 def _skip_message() -> str:
@@ -135,6 +141,55 @@ class ParseArticlesTests(unittest.TestCase):
         self.assertEqual(articles[0].title.strip(), "Article en vedette")
         self.assertEqual(articles[0].summary, "Un résumé riche en informations.")
         self.assertEqual(articles[0].date, "5 mai 2024")
+
+
+@unittest.skipIf(parse_rss_feed is None or find_rss_feed_url is None, _skip_message())
+class FeedFallbackTests(unittest.TestCase):
+    def test_find_rss_feed_url_returns_absolute_url(self) -> None:
+        html = """
+        <html>
+          <head>
+            <link rel="alternate" type="application/rss+xml" href="/adminsite/webservices/export_rss.jsp?NOMBRE=10" />
+          </head>
+          <body></body>
+        </html>
+        """
+
+        feed_url = find_rss_feed_url(html)
+
+        self.assertEqual(
+            feed_url,
+            "https://actus.ulb.be/adminsite/webservices/export_rss.jsp?NOMBRE=10",
+        )
+
+    def test_parse_rss_feed_extracts_articles(self) -> None:
+        xml = """
+        <rss version="2.0" xmlns:dc="http://purl.org/dc/elements/1.1/">
+          <channel>
+            <item>
+              <title>Article RSS 1</title>
+              <link>/fr/actus/article-rss-1</link>
+              <description><![CDATA[<p>Résumé <strong>riche</strong></p>]]></description>
+              <pubDate>Mon, 10 Jun 2024 12:00:00 +0200</pubDate>
+            </item>
+            <item>
+              <title>Article RSS 2</title>
+              <link>https://actus.ulb.be/fr/actus/article-rss-2</link>
+              <description>Second résumé</description>
+              <dc:date>2024-06-11</dc:date>
+            </item>
+          </channel>
+        </rss>
+        """
+
+        articles = parse_rss_feed(xml)
+
+        self.assertEqual(len(articles), 2)
+        self.assertEqual(articles[0].title, "Article RSS 1")
+        self.assertIn("Résumé", articles[0].summary)
+        self.assertEqual(articles[0].date, "Mon, 10 Jun 2024 12:00:00 +0200")
+        self.assertEqual(articles[1].url, "https://actus.ulb.be/fr/actus/article-rss-2")
+        self.assertEqual(articles[1].date, "2024-06-11")
 
 
 if __name__ == "__main__":

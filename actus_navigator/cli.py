@@ -11,9 +11,8 @@ from .client import (
     ArticleDetailParseError,
     ArticleListParseError,
     fetch_article,
-    fetch_listing,
+    get_listing_articles,
     parse_article_detail,
-    parse_articles,
 )
 
 
@@ -65,9 +64,8 @@ class NewsNavigator:
     # Internals
     # ------------------------------------------------------------------
     def _load_page(self, page_index: int) -> None:
-        html = fetch_listing(page_index)
         try:
-            articles = parse_articles(html)
+            articles = get_listing_articles(page_index, page_size=self.page_size)
         except ArticleListParseError as exc:
             raise RuntimeError(f"Impossible d'interpréter la liste d'actualités: {exc}") from exc
         self._articles = articles
